@@ -1,6 +1,5 @@
 """The Test file for CLI (General)."""
 
-import configparser
 import json
 import logging
 import os
@@ -37,6 +36,13 @@ from sqlfluff.cli.commands import (
 from sqlfluff.core.parser import CommentSegment
 from sqlfluff.core.rules import BaseRule, LintFix, LintResult
 from sqlfluff.utils.testing.cli import invoke_assert_code
+
+# tomllib is only in the stdlib from 3.11+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:  # pragma: no cover
+    import toml as tomllib
+
 
 re_ansi_escape = re.compile(r"\x1b[^m]*m")
 
@@ -709,9 +715,9 @@ def test__cli__command_versioning():
     # Get the package version info
     pkg_version = sqlfluff.__version__
     # Get the version info from the config file
-    config = configparser.ConfigParser()
-    config.read_file(open("setup.cfg"))
-    config_version = config["metadata"]["version"]
+    with open("pyproject.toml", "r") as config_file:
+        config = tomllib.loads(config_file.read())
+    config_version = config["project"]["version"]
     assert pkg_version == config_version
     # Get the version from the cli
     runner = CliRunner()
@@ -1133,6 +1139,24 @@ def test__cli__command_fix_stdin(stdin, rules, stdout):
             "   select    *    FRoM     t    ",
             "select * from t\n",
         ),
+        (
+            # Check that warnings related to parsing errors on input don't
+            # go to stdout. This query shouldn't change, but stdout should
+            # remain clean.
+            # https://github.com/sqlfluff/sqlfluff/issues/5327
+            "select\n"
+            "    count(*) over (\n"
+            "        order by a desc \n"
+            "        range between b row and '10 seconds' following  -- noqa: PRS\n"
+            "    ) as c\n"
+            "from d\n",
+            "select\n"
+            "    count(*) over (\n"
+            "        order by a desc \n"
+            "        range between b row and '10 seconds' following  -- noqa: PRS\n"
+            "    ) as c\n"
+            "from d\n",
+        ),
     ],
 )
 def test__cli__command_format_stdin(stdin, stdout):
@@ -1143,8 +1167,9 @@ def test__cli__command_format_stdin(stdin, stdout):
             ("-", "--disable-progress-bar", "--dialect=ansi"),
         ],
         cli_input=stdin,
+        mix_stderr=False,
     )
-    assert result.output == stdout
+    assert result.stdout == stdout
 
 
 def test__cli__command_fix_stdin_logging_to_stderr(monkeypatch):

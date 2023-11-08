@@ -6,7 +6,7 @@ This class is a construct to keep track of positions within a file.
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Optional, Tuple
 
-from sqlfluff.core.slice_helpers import zero_slice
+from sqlfluff.core.helpers.slice import zero_slice
 
 if TYPE_CHECKING:
     from sqlfluff.core.templaters import TemplatedFile  # pragma: no cover
@@ -237,7 +237,7 @@ class PositionMarker:
 
         This value is used for:
         - Ignoring linting errors in templated sections.
-        - Whether `iter_patches` can return without recursing.
+        - Whether `_iter_templated_patches` can return without recursing.
         - Whether certain rules (such as JJ01) are triggered.
         """
         return self.templated_file.is_source_slice_literal(self.source_slice)
